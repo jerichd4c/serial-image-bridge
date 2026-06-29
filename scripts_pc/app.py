@@ -2,6 +2,7 @@ import customtkinter as ctk
 from tkinter import filedialog
 import threading
 import os
+from PIL import Image
 
 # Import transmitter module
 from transmitter import send_and_receive_image
@@ -14,13 +15,17 @@ class ImageTransmitterApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        # Received image counter
-        self.transmission_count = 1
-
         self.title("Serial Image Transmitter")
         self.geometry("850x600")
 
         self.selected_image_path = None
+
+        # Received image counter
+        self.transmission_count = 1
+
+        # Create output dir
+        self.output_dir = "outputs"
+        os.makedirs(self.output_dir, exist_ok=True)
 
         # Initial grid config
         self.grid_columnconfigure(0, weight=1) # Left
@@ -76,11 +81,8 @@ class ImageTransmitterApp(ctk.CTk):
         self.frame_bottom = ctk.CTkFrame(self)
         self.frame_bottom.grid(row=2, column=0, columnspan=3, padx=20, pady=20, sticky="nsew")
         
-        self.lbl_logger = ctk.CTkLabel(self.frame_bottom, anchor="w")
-        self.lbl_logger.pack(padx=10, pady=(5, 0), fill="x")
-        
         self.logger = ctk.CTkTextbox(self.frame_bottom, height=120, state="disabled")
-        self.logger.pack(padx=10, pady=(0, 10), fill="both", expand=True)
+        self.logger.pack(padx=10, pady=10, fill="both", expand=True)
 
     # APP LOGIC
 
@@ -94,6 +96,15 @@ class ImageTransmitterApp(ctk.CTk):
             self.selected_image_path = file_path
             file_name = os.path.basename(file_path)
             self.lbl_initial_title.configure(text=file_name, text_color="white")
+
+            # Initial image preview
+            try: 
+                pil_img = Image.open(file_path)
+                ctk_img = ctk.CTkImage(dark_image=pil_img, size=(220, 220))
+                self.canvas_initial.configure(image=ctk_img, text="")
+            except Exception as e:
+                self.log_message(f"Error cargando miniatura: {e}")
+
             self.btn_send.configure(state="normal") # Enable send button
             self.log_message(f"Selected file: {self.selected_image_path}")
 
@@ -122,6 +133,8 @@ class ImageTransmitterApp(ctk.CTk):
     def run_transmission(self):
         # generate dinamic output name: 1, 2, 3...
         output_name = f"received_image_{self.transmission_count}.png"
+        # Abs route for outputs
+        output_path = os.path.join(self.output_dir, output_name)
 
         # Calls the transmitter.py module
         send_and_receive_image(
@@ -134,11 +147,22 @@ class ImageTransmitterApp(ctk.CTk):
 
         # Update received title and update counter
         self.after(0, lambda: self.lbl_received_title.configure(text=output_name, text_color="white"))
+        self.after(0, lambda: self.display_received_image(output_path))
         self.transmission_count += 1
 
         # Enable buttons again after process ends
         self.after(0, lambda: self.btn_send.configure(state="normal"))
         self.after(0, lambda: self.btn_select.configure(state="normal"))
+    
+    def display_received_image(self, path):
+        # Load processed image after transmission ends
+        try: 
+            if os.path.exists(path):
+                pil_img = Image.open(path)
+                ctk_img = ctk.CTkImage(dark_image=pil_img, size=(220, 220))
+                self.canvas_received.configure(image=ctk_img, text="")
+        except Exception as e:
+            self.log_message(f"Error al mostrar imagen recibida: {e}")
 
 if __name__ == "__main__":
     app = ImageTransmitterApp()
