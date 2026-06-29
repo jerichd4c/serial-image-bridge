@@ -14,30 +14,75 @@ class ImageTransmitterApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
+        # Received image counter
+        self.transmission_count = 1
+
         self.title("Serial Image Transmitter")
-        self.geometry("600x500")
+        self.geometry("850x600")
 
         self.selected_image_path = None
 
-        # Layout
-        self.lbl_title = ctk.CTkLabel(self, text="Hardware Image Transmitter", font=ctk.CTkFont(size=20, weight="bold"))
-        self.lbl_title.pack(pady=20)
+        # Initial grid config
+        self.grid_columnconfigure(0, weight=1) # Left
+        self.grid_columnconfigure(1, weight=1) # Center
+        self.grid_columnconfigure(2, weight=1) # Right
+        self.grid_rowconfigure(1, weight=1)    # Main row
 
-        # Select img button
-        self.btn_select = ctk.CTkButton(self, text="1. Select Image", command=self.select_image)
+        # Title
+        self.lbl_title = ctk.CTkLabel(self, text="Hardware Image Transmitter", font=ctk.CTkFont(size=22, weight="bold"))
+        self.lbl_title.grid(row=0, column=0, columnspan=3, pady=(20, 10))
+
+        # Left column: initial image
+        self.frame_left = ctk.CTkFrame(self, fg_color="transparent")
+        self.frame_left.grid(row=1, column=0, padx=20, pady=10, sticky="nsew")
+
+        self.lbl_initial_title = ctk.CTkLabel(self.frame_left, text="Image to convert")
+        self.lbl_initial_title.pack(pady=5)
+
+        # Initial image placeholder
+        self.canvas_initial = ctk.CTkLabel(self.frame_left, text="INITIAL\nIMAGE", width=220, height=220, fg_color="gray25", corner_radius=10)
+        self.canvas_initial.pack(pady=10)
+
+        # Select image button
+        self.btn_select = ctk.CTkButton(self.frame_left, text="1. Select Image", command=self.select_image)
         self.btn_select.pack(pady=10)
 
-        # Img route label
-        self.lbl_path = ctk.CTkLabel(self, text="No image selected", text_color="gray")
-        self.lbl_path.pack(pady=5)
+        # Central column: options
+        self.frame_center = ctk.CTkFrame(self, fg_color="transparent")
+        self.frame_center.grid(row=1, column=1, padx=10, pady=10, sticky="n")
 
-        # Start byte transmission button
-        self.btn_send = ctk.CTkButton(self, text="2. Start Transmission", command=self.start_transmission_thread, fg_color="green", state="disabled")
+        self.lbl_options = ctk.CTkLabel(self.frame_center, text="Options", font=ctk.CTkFont(size=18, underline=True))
+        self.lbl_options.pack(pady=(40, 10))
+
+        self.switch_grayscale = ctk.CTkSwitch(self.frame_center, text="Grayscale")
+        self.switch_grayscale.select() # Set by default
+        self.switch_grayscale.pack(pady=10)
+
+        # Right column: received image
+        self.frame_right = ctk.CTkFrame(self, fg_color="transparent")
+        self.frame_right.grid(row=1, column=2, padx=20, pady=10, sticky="nsew")
+
+        self.lbl_received_title = ctk.CTkLabel(self.frame_right, text="Received image")
+        self.lbl_received_title.pack(pady=5)
+
+        # Received image placeholder
+        self.canvas_received = ctk.CTkLabel(self.frame_right, text="RECEIVED\nIMAGE", width=220, height=220, fg_color="gray25", corner_radius=10)
+        self.canvas_received.pack(pady=10)
+
+        self.btn_send = ctk.CTkButton(self.frame_right, text="2. Start Transmission", command=self.start_transmission_thread, fg_color="green", state="disabled")
         self.btn_send.pack(pady=10)
 
-        # Event logger textbox
-        self.logger = ctk.CTkTextbox(self, width=500, height=200, state="disabled")
-        self.logger.pack(pady=20) 
+        # Lower row: logger
+        self.frame_bottom = ctk.CTkFrame(self)
+        self.frame_bottom.grid(row=2, column=0, columnspan=3, padx=20, pady=20, sticky="nsew")
+        
+        self.lbl_logger = ctk.CTkLabel(self.frame_bottom, anchor="w")
+        self.lbl_logger.pack(padx=10, pady=(5, 0), fill="x")
+        
+        self.logger = ctk.CTkTextbox(self.frame_bottom, height=120, state="disabled")
+        self.logger.pack(padx=10, pady=(0, 10), fill="both", expand=True)
+
+    # APP LOGIC
 
     def select_image(self):
         # Select image to transmit
@@ -47,7 +92,8 @@ class ImageTransmitterApp(ctk.CTk):
         )
         if file_path:
             self.selected_image_path = file_path
-            self.lbl_path.configure(text=os.path.basename(file_path), text_color="white")
+            file_name = os.path.basename(file_path)
+            self.lbl_initial_title.configure(text=file_name, text_color="white")
             self.btn_send.configure(state="normal") # Enable send button
             self.log_message(f"Selected file: {self.selected_image_path}")
 
@@ -74,7 +120,8 @@ class ImageTransmitterApp(ctk.CTk):
 
     # This function runs in the background
     def run_transmission(self):
-        output_name = "received_image2.png"
+        # generate dinamic output name: 1, 2, 3...
+        output_name = f"received_image_{self.transmission_count}.png"
 
         # Calls the transmitter.py module
         send_and_receive_image(
@@ -84,6 +131,10 @@ class ImageTransmitterApp(ctk.CTk):
             BAUD_RATE=9600,
             LOG_CALLBACK=self.log_message
         )
+
+        # Update received title and update counter
+        self.after(0, lambda: self.lbl_received_title.configure(text=output_name, text_color="white"))
+        self.transmission_count += 1
 
         # Enable buttons again after process ends
         self.after(0, lambda: self.btn_send.configure(state="normal"))
